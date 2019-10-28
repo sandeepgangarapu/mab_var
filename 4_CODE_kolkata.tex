@@ -1,0 +1,51 @@
+\documentclass[12pt, letterpaper]{article}
+\usepackage[letterpaper,margin=1in]{geometry}
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{lipsum}
+\usepackage{comment}
+\usepackage[ruled,vlined,boxed]{algorithm2e}
+\usepackage{graphicx}
+\usepackage{natbib}
+\usepackage{todonotes}
+\bibliographystyle{apalike}
+
+\usepackage{amsmath}
+\usepackage{bibentry}
+\linespread{1.0}
+
+\title{Multi-Armed Bandits with Inference Considerations}
+\date{}
+\author{Sandeep Gangarapu \\University of Minnesota \and Edward McFowland III \\University of Minnesota \and Ravi Bapna \\University of Minnesota}
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Multi-armed bandits (MAB) are sequential experimentation procedures that use a combination of exploration and exploitation techniques to reduce allocations to interventions with sub-optimal outcomes. Compared to A/B testing, MAB's are very effective in reducing the regret of the experimentation process, especially in the presence of multiple policy levers. However, unlike A/B testing, MAB's may fail to accurately estimate the parameters of treatment effect distributions of interventions \citep{nie2017adaptively}. In many Marketing, Clinical Trials, and Public Policy settings, estimating the parameters of treatment effect distributions is as important as that of identifying the best intervention for reasons ranging from feedback for intervention designers to making ROI decision for marketers. In this paper, we propose a new MAB algorithm called UCB-INF that solves the above problem. We show that UCB-INF has regret comparable to the best MAB algorithms while having the parameter estimation properties of A/B testing. 
+\end{abstract}
+
+% keywords can be removed
+{Keywords: Multi-armed bandit, A/B testing, Variance estimation, Inference}
+
+\section*{Introduction}
+A/B testing is an experimentation strategy used to infer the effectiveness of an intervention compared to a baseline (control). Due to the proliferation of internet technologies, A/B testing is widely used on internet platforms like Amazon, Microsoft, Google, etc. \citep{kohavi2009controlled}. It is used in a variety of tasks, e.g., to test various design features of a website, test multiple marketing campaigns, etc. For a given tolerance of Type 1 and Type 2 errors, A/B testing is very effective in statistically rejecting a null hypothesis (i.e. the intervention has no additional benefit compared to the baseline). During an A/B test, units are allocated randomly to the baseline condition (control group) and the interventions (treatment groups). If the mean of the treatment outcomes is statistically different compared to the mean of control outcomes, we consider treatment to be effective.  Typically, during the exploration phase of an A/B test, multiple variants of a feature/ad/promotion are tested, and the best performing option is selected to be exploited for the subsequent time period.
+
+While A/B testing is effective in online experimentation, it has many challenges. In the presence of multiple interventions, there is a loss of utility (regret) in assigning subjects to sub-optimal conditions during the experimentation process \citep{white2012bandit}. Multi-armed bandit(MAB) methods that use a combination of exploration and exploitation techniques are used to overcome this challenge. Unlike A/B testing, allocation procedure in MAB methods is not random. Instead, MAB's use dynamic allocation procedure based on outcome distribution at any given point of time. Multi-armed bandits derive their name from slot machines (one-armed bandits) at a casino. A gambler has multiple slot machines with unknown payoff distributions to choose. At each time period, the gambler plays an arm of a slot machine observes a payoff. The objective of the gambler is to maximize the total payoff obtained after a series of $n$ arm plays. This is equivalent to minimizing the regret i.e. the difference between the expected payoff obtained by playing the best arm $n$ times and the observed payoffs \citep{lattimore2018bandit}. 
+
+Each MAB algorithm differs in its adaptive allocation procedure. For example, in Beta-Bernoulli Thompson sampling MAB \citep{thompson1933likelihood}, the outcome distribution of each arm is initialized as beta distribution with random parameters. At each round, a sample is drawn from prior distribution and the arm that has the highest value of the draw is played. The Bernoulli payoff is observed, and a posterior distribution is estimated using a Bayesian update. This process is continued for $n$ arm plays. In the experimentation process, interventions are similar to arms of MAB, and outcomes are payoffs. The adaptive procedure reduces the regret of the experimentation process as allocations to sub-optimal interventions are considerably less. \cite{schwartz2017customer} used Thompson Sampling based MAB algorithm and achieved an 8\% increase in customer acquisition rate on an online display advertising campaign compared to A/B testing.
+
+In experiments that involve a large number of interventions (e.g. testing multiple ad variants), MAB's are effective as optimizing for regret solves the problem of the total number of sub-optimal allocations. However, it is possible that some interventions receive so few allocations that inference about the mean and variance of the outcome distributions are highly inaccurate. This is not a problem in contexts where the only objective is to minimize regret and find the intervention that performs the best. However, in many settings, accurate estimation of mean and variance of outcome distributions of all interventions is critical as that knowledge is used to design future experiments and helps strengthen the domain knowledge of the practitioner. For example, in clinical trials, knowing the effect size and variance of the drug is crucial for scientists who developed the drug \citep{nie2017adaptively}. This is also true for most public policy and high-cost marketing campaign settings.
+
+In order to solve this problem, we propose a new MAB algorithm called "UCB-INF" where allocations are made not only to minimize the overall regret but also to accurately estimate the mean and variance outcome distributions of all interventions. We demonstate using simulations and show that UCB-INF has regret comparable to the best-in-class MAB's and also has mean and variances estimation properties of A/B testing.
+
+\nobibliography{references}
+
+
+\end{document}
+
+

@@ -1,0 +1,201 @@
+\documentclass[12pt, letterpaper]{article}
+\usepackage[letterpaper,margin=1in]{geometry}
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{lipsum}
+\usepackage{comment}
+\usepackage[ruled,vlined,boxed]{algorithm2e}
+\usepackage{graphicx}
+\usepackage{natbib}
+\usepackage{todonotes}
+\bibliographystyle{apalike}
+\usepackage{amsmath}
+\DeclareMathOperator*{\argmax}{argmax} 
+\linespread{1.0}
+
+\title{Multi-Armed Bandits with Inference Considerations}
+\date{}
+\author{Sandeep Gangarapu \\University of Minnesota \and Edward McFowland III \\University of Minnesota \and Ravi Bapna \\University of Minnesota}
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Multi-armed bandits (MAB) are sequential experimentation procedures that use a combination of exploration and exploitation techniques to reduce allocations to interventions with sub-optimal outcomes. MAB's are very effective in reducing the regret of the experimentation process compared to A/B testing, especially in the presence of multiple policy levers. However, unlike A/B testing, MAB's may fail to accurately estimate the parameters of treatment effect distributions of interventions. In many Marketing, Clinical Trials, and Public Policy settings, estimating the parameters of treatment effect distributions is as crucial as that of identifying the best intervention, e.g., feedback for intervention designers. In this paper, we propose a new MAB algorithm called UCB-INF that solves the above problem. We show that UCB-INF has regret comparable to the best MAB algorithms while having the parameter estimation properties of A/B testing. 
+\end{abstract}
+
+% keywords can be removed
+{Keywords: Multi-armed bandit, A/B testing, variance estimation}
+
+\section*{Introduction}
+A/B testing is an experimentation strategy used to infer the effectiveness of an intervention compared to a baseline (control). Many scientific fields like Agriculture, Medicine, Social Sciences, Online Experimentation, etc. use A/B testing. Due to the proliferation of internet technologies, A/B testing is widely used on internet platforms like Amazon, Microsoft, Google, etc. \citep{kohavi2009controlled}. It is used in a variety of tasks, e.g., to test various design features of a website, test multiple marketing campaigns, etc. For a given tolerance of Type 1 and Type 2 errors, A/B testing is very effective in statistically rejecting a null hypothesis (i.e. the intervention has no additional benefit compared to the baseline). During an A/B test, units are allocated randomly to the baseline condition (control group) and the interventions (treatment groups). If the mean of the treatment outcomes is statistically different compared to the mean of control outcomes, we consider treatment to be effective.  Typically, during the exploration phase of an A/B test, multiple variants of a feature/ad/promotion are tested, and the best performing option is selected to be exploited for the subsequent time period.
+
+While A/B testing is effective in online experimentation, it has many challenges. In the presence of multiple interventions, there is a loss of utility (regret) in assigning subjects to sub-optimal conditions during the experimentation process \citep{white2012bandit}. Multi-armed bandit(MAB) methods that use a combination of exploration and exploitation techniques are used to overcome this challenge. Unlike A/B testing, allocation procedure in MAB methods is not random. Instead, MAB's use dynamic allocation procedure based on outcome distribution at any given point of time. Multi-armed bandits derive their name from slot machines (one-armed bandits) at a casino. A gambler has multiple slot machines with unknown payoff distributions to choose. At each time period, the gambler plays an arm of a slot machine observes a payoff. The objective of the gambler is to maximize the total payoff obtained after a series of $n$ arm plays. This is equivalent to minimizing the regret i.e. the difference between the expected payoff obtained by playing the best arm $n$ times and the observed payoffs \citep{lattimore2018bandit}. 
+
+Each MAB algorithm differs in its adaptive allocation procedure. For example, in Beta-Bernoulli Thompson sampling MAB \citep{thompson1933likelihood}, the outcome distribution of each arm is initialized as beta distribution with random parameters. At each round, a sample is drawn from prior distribution and the arm that has the highest value of the draw is played. The Bernoulli payoff is observed, and a posterior distribution is estimated using a Bayesian update. This process is continued for $n$ arm plays. In the experimentation process, interventions are similar to arms of MAB, and outcomes are payoffs. The adaptive procedure reduces the regret of the experimentation process as allocations to sub-optimal interventions are considerably less. \cite{schwartz2017customer} used Thompson Sampling based MAB algorithm and achieved an 8\% increase in customer acquisition rate on an online display advertising campaign compared to A/B testing.
+
+In experiments that involve a large number of interventions (e.g. testing multiple ad variants), MAB's are effective as optimizing for regret solves the problem of the total number of sub-optimal allocations. However, it is possible that some interventions receive so few allocations that inference about the mean and variance of the outcome distributions are highly inaccurate. This is not a problem in contexts where the only objective is to minimize regret and find the intervention that performs the best. However, in many settings, accurate estimation of mean and variance of outcome distributions of all interventions is critical as that knowledge is used to design future experiments and helps strengthen the domain knowledge of the practitioner. For example, in clinical trials, knowing the effect size and variance of the drug is crucial for scientists who developed the drug \citep{nie2017adaptively}. This is also true for most public policy and high-cost marketing campaign settings.
+
+In order to solve this problem, we propose a new MAB algorithm called "UCB-INF" where allocations are made not only to minimize the overall regret but also to accurately estimate the mean and variance outcome distributions of all interventions. UCB-INF has regret comparable to the best-in-class MAB's and also has mean and variances estimation properties of A/B testing. In the next section, we discuss the literature related to MAB's and A/B testing. We then formally define the MAB problem and provide the algorithm for UCB-INF. We then compare it to A/B testing, and popular MAB methods like Upper Confidence Bound (UCB) and Epsilon-Greedy ($\epsilon$-greedy). We then describe the simulation procedure and compare the results and properties of MAB-VAR with other allocation procedures.
+
+
+
+\section*{Related Literature}
+
+Multi-armed bandits are sequential experimentation problems with an exploration-exploitation trade-off. The key decision in an armed bandit problem is to whether stay with the intervention with the highest payoff based on observed data and exploit it or explore other interventions that might give higher payoffs in the future. Bandit problems have been studied since the 1930s and have application in several problem domains such as clinical trials, ad placement, website optimization, packet routing \citep{bubeck2012regret}. 
+
+One of the early bandit applications was in a clinical trial setting where \cite{thompson1933likelihood} used adaptive allocation to dynamically assign subjects to different drugs based on the observed outcomes in order to minimize allocations to the drug that did not perform well. In Thompson sampling, prior outcome distributions for each intervention are initialized with random parameters. At each round, a sample is drawn from each of these distributions, and an allocation is made to the intervention that has the highest value of the draw. An outcome is observed, and posterior distribution of that intervention is estimated using Bayesian update. This process is repeated every round. $\epsilon$-greedy is another simple algorithm where exploration and exploitation are clearly specified \citep{kuleshov2014algorithms}. At each round, the intervention with the best estimated mean outcome so far is selected with probability $\epsilon$ and a random intervention is selected with the empirical probability of $1-\epsilon$. However, the constant $\epsilon$ prevents the algorithm from asymptotically converging to the best arm \citep{vermorel2005multi}. Upper confidence bound (UCB) is one of the most efficient MAB algorithms.  In UCB algorithm, at each round, upper confidence bound of mean is calculated for each intervention using Chernoff-Hoeffding bound \citep{chernoff1952measure} and allocation is made to the intervention with the highest value of UCB. The intuition behind UCB is that if an allocation is made to the sub-optimal intervention, then a value drawn from that distribution reduces the upper confidence bound of the mean which in-turn makes it less probable for that intervention to have higher UCB in the future. 
+
+MAB's have many practical applications. \cite{villar2018bandit} use MAB's in the context of clinical trials for rare, life-threatening diseases where the priority is given to patient over hypothesis testing. \cite{schwartz2017customer} use MAB's to acquire customers by adaptively showing different types of ads on various websites. They report an 8\% increase in conversion rate over traditional A/B testing. \cite{misra2019dynamic} use a combination of MAB's and microeconomic choice theory in a dynamic pricing setting and show a 43\% increase in profits. Most online experimentation platforms like Google Optimize, Optimizely, Facebook Ax, use MAB's for practical applications.
+
+
+\section*{Problem Formulation}
+
+Multi Armed Bandit problem is generally framed as a game played between a learner and an environment. There are a total of $N$ rounds in the game where $N$ is called the horizon. In experimentation, this is equivalent to the total number of subjects available for allocation. There are $k$ arms available which is the total number of treatment groups or interventions including one control group. We assume the outcome distribution of each arm $a$ follows a Gaussian distribution $\mathcal{N}(\mu_a, \sigma_a^2)$. At each time $t$ an arm $a_t$ is played and the corresponding outcome $x_{a_t}$ is drawn from $\mathcal{N}(\mu_{a_t}, \sigma_{a_t}^2)$. The mean reward estimate of an arm $a$ is given by $\Bar{x}_a$ an the variance estimate is given by $s_a^2$. The mean reward of the best arm is given by 
+$$\mu^* = \max_{a=1,2..k}\Bar{x}_a$$ 
+The empirical regret at any time period $t$ is given by
+$$\mathcal{R}_t = \mu^* . t - \sum_{t=1}^{t} x_{a_t}$$
+The root mean square error of mean estimate and variance estimate of all arms in given by 
+$$RMSE_{mt} = \sqrt{\sum_{a=1}^{k} \frac{(\mu_a -\Bar{x}_a)^2}{k}}, \: RMSE_{vt} = \sqrt{\sum_{a=1}^{k} \frac{(\sigma_a^2 - s_a^2)^2}{k}}$$
+
+
+In general, the objective of most MAB algorithms is to minimize regret. The objective of UCB-INF is not only to minimize regret but also to estimate $\mu_{a}, \sigma_{a}^2$ accurately by reducing $RMSE_m, RMSE_v$.
+
+\begin{algorithm}
+\SetAlgoLined
+Inputs: {Probability of variance based allocation ($\epsilon \in [0,1]$), No. of interventions ($k$), No. of subjects ($N$), Variance change tolerance ($\tau$)}
+
+Initialize $s_a^2$ = 0 (Variance estimate), ${s'_a}^2$ = 0 (Variance change estimate)
+
+/* At the start, we make one allocation per arm. This is required to calculate Upper Confidence Bound*/ 
+
+\For{$a = 1,2,3...k$}
+{Choose intervention $a$ \\
+Observe reward $x_a$ \\
+Calculate $s_a^2$, ${s_a'}^2$  \\
+
+}
+\For{$a = k+1, k+2.....N$}{
+
+Draw from Uniform distribution $d \sim U(0,1)$ \\
+\uIf {$d > \epsilon$}{
+\For {$a = 1,2,3...k$}{
+$UCB_a = \Bar{x_a} + \sqrt{\frac{2*log(N)}{n_a}}$
+
+}
+u = $\argmax_a UCB_a$ \\
+Choose intervention $u$ \\
+Observe payoff $x_u$ \\
+Calculate $s_u^2$, ${s_u'}^2$  \\
+}
+\Else{
+
+\uIf{$\max_a {s_a'}^2 < \tau $}{Continue}
+\Else{
+
+\For {$a = 1,2,3...k$}{
+Draw from $\Tilde{s_a}^2 \sim \mathcal{N}( \frac{s_a^2}{n-1}, \frac{s_a^4}{n-1})$ \\
+}
+
+v = $\argmax_a \Tilde{s_a}^2$ \\
+Choose intervention $v$ \\
+Observe payoff $x_v$ \\
+Calculate $s_v^2$, ${s_v'}^2$  \\}
+}
+}
+\caption{UCB-INF Algorithm}
+\label{ucb_var_alg}
+\end{algorithm}
+
+\subsection*{UCB-INF Algorithm}
+
+UCB-INF is motivated by Upper Confidence Bound (UCB) and $\epsilon$-greedy algorithms. In $\epsilon$-greedy, an $\epsilon$ is chosen, and a constant exploration is done with a probability of $\epsilon$ and exploitation is done with probability $1-\epsilon$. $\epsilon$-greedy has a regret bound of $\mathcal{O}(klogN)$ and is not the most efficient of algorithms. If an optimal $\epsilon$ is not chosen, the performance degrades over time \citep{bubeck2012regret}. UCB algorithm is more efficient and has sub-linear regret bound of $\mathcal{O}(logN)$. However, there is no guarantee of significant exploration across all arms, so, the inference of parameters of outcome distributions may not be accurate. UCB-INF overcomes this by making variance-based allocations. 
+
+Similar to $\epsilon$-greedy, at each round, UCB-INF makes allocations according to UCB algorithm with a probability of $1-\epsilon$ and variance-based allocation with a probability of $\epsilon$. $\epsilon$ can be treated as a hyper-parameter and can be changed by the user.
+
+Variance-based allocation is defined as follows. For a Gaussian outcome distribution, the sample mean, $\Bar{x}$ is drawn from the distribution $\mathcal{N}(\mu, \frac{\sigma^2}{n})$ and sample variance, $s^2$ is drawn from $\mathcal{N}( \frac{\sigma^2}{n}, \frac{\sigma^4}{n})$. This means that the variance of variance estimate is proportional to the square of true variance and inversely proportional to the sample size. Variance-based allocation uses the principle of Thompson sampling. The prior distribution here is the distribution of sample variance $s^2 \sim \mathcal{N}( \frac{\sigma^2}{n}, \frac{\sigma^4}{n})$. As we do not know the true population variance, we use sample variance $s^2$ in order to estimate sample variance distribution $s^2 \sim \mathcal{N}( \frac{s^2}{n-1}, \frac{s^4}{n-1})$. For each arm, a draw is made from sample variance distribution of that arm and the arm with the highest value of draw is made an allocation. A reward $x_{a_t}$ is observed and is used to estimate the posterior distribution. This process constitutes the variance-based allocation.
+
+There is another hyper-parameter $\tau$ called variance change tolerance which dictates the stopping point of variance-based allocation. After each round, we track the change in the variance estimate of an arm after observing the reward. If the maximum variance change across all arms is less than variance change tolerance, the allocation shifts to UCB. This process makes it more efficient. 
+
+The intuition behind UCB-INF is to make the most of the efficiency provided by UCB while using selective exploration for estimating mean and variance of the arms effectively. The algorithm \ref{ucb_var_alg} shows the step by step procedure for UCB-INF.
+
+
+\section*{Simulation and Results}
+
+\subsection*{Simulation setup}
+
+We ran simulations and compared the performances of A/B testing, UCB, $\epsilon$-greedy and UCB-INF in order to compare their properties. We expect UCB-INF to have regret minimization properties of UCB and variance estimation properties of A/B testing. The experimental setup has one control condition and nine other treatment conditions. We assume the outcome distribution to be Gaussian. We set the control mean at 0 and randomly draw treatment group means from a uniform distribution between 0 and 5. Similarly, we draw all outcome variances from a uniform distribution of 0 and 5. We chose 2000 subjects available for allocation and sequentially allocate the subjects based on algorithmic suggestions. If an algorithm suggests group 3 to be allocated, we draw from $\mathcal{N}(\mu_3,\sigma_3^2)$ and set it as the payoff.
+For A/B testing, the sample size is decided based on the smallest effect size of all arms. This is because the sample size in A/B testing is the same across all arms and should have sufficient power to detect the minimum effect size. We chose a significance level of 0.05 and a power of 0.8. Exploration is done until each group is uniformly allocated with the number of subjects decided from power analysis with the above parameters. After exploration, the intervention with the highest mean of the observed outcome is allocated the remaining subjects. Sample size need not be set for MAB's as they are sequential allocation algorithms. For both $\epsilon$-greedy and UCB-INF, the $\epsilon$ i.e. probability of exploration is set at 0.1. The variance change tolerance for UCB-INF is set at 0.05.
+
+\begin{figure}[h]
+  \centering
+    \includegraphics[width=\textwidth]{figs/group.png}
+      \caption{This figure shows the allocations of subjects to treatment groups over time for different allocation procedures}
+      \label{group}
+\end{figure}
+
+\begin{figure}
+  \centering
+    \includegraphics[width=\textwidth]{figs/regret.png}
+      \caption{This figure shows the regret of different allocation procedures over time}
+      \label{regret}
+\end{figure}
+
+
+\subsection*{Results}
+
+We ran the simulation for A/B testing, UCB, $\epsilon$-greedy and UCB-INF by allocating subjects to different treatment conditions as per algorithmic suggestions and drawing a value from the outcome distribution of allocated intervention. Fig:\ref{group} shows how subjects are allocated to different interventions by different algorithms. It can be seen that all groups in A/B testing are sequentially allocated until the smallest effect is detected with sufficient power. Once the exploration is done, the rest of the subjects are allocated to group 5 as it has the highest mean outcome. Allocations in UCB are much more efficient and they swiftly converge to group 5. However, most treatment groups barely receive any allocations. For example, group 0 only has two subjects allocated and group 3 only has one subject allocated.  Owing to this, the estimation of mean and variance is inaccurate. This can be seen from Fig:\ref{var_rmse} where UCB has the highest RMSE of variance estimation and does not reduce even after all subjects are allocated. This is because the primary objective of UCB is to reduce regret and has one of the best finite time regret bounds among MAB algorithms. Fig:\ref{var} shows the variance estimate provided by different allocation procedures at different time periods. The black solid line represents the true variances drawn from the uniform distribution of 0 and 5. 
+
+
+Both $\epsilon$-greedy and UCB-INF converge to the best intervention, however, exploration in $\epsilon$-greedy is random while exploration in UCB-INF is selective. In UCB-INF, allocations are made to those interventions where there is high uncertainty in the variance estimate. Also, the variance change tolerance parameter helps in further reducing the regret. Once there is certainty in the variance estimate, UCB-INF switches to UCB more frequently. This can be seen in Fig:\ref{regret} where after initial exploration, the regret line of UCB and UCB-INF stay parallel. In contrast, the regret line of $\epsilon$-greedy keeps increasing as more allocations are made. The variance estimation properties of A/B testing, UCB-INF and $\epsilon$-greedy are equally good because of continuous exploration across all arms by A/B testing and $\epsilon$-greedy and selective exploration by UCB-INF. Fig:\ref{var} shows that, for all arms, the estimate of the variance converges to true variance for every algorithm except UCB. This shows that the variance estimation properties of UCB-INF are as good as A/B testing.
+
+Overall, we see that UCB-INF does sacrifice the overall utility but the regret is still comparable to that of UCB which has one of the best regret bounds among MAB algorithms. At the same time, the variance estimation of UCB-INF is as good as A/B testing. 
+
+
+
+\begin{figure}
+  \centering
+    \includegraphics[width=\textwidth]{figs/var_rmse.png}
+      \caption{This figure shows the root mean squared error of variance estimation by different allocation procedures over time}
+      \label{var_rmse}
+\end{figure}
+
+
+\begin{figure}[]
+  \centering
+    \includegraphics[width=\textwidth]{figs/var.png}
+      \caption{This figure shows the variance estimate of different algorithms for multiple interventions}
+      \label{var}
+\end{figure}
+
+
+
+
+\section*{Conclusion and Future Work}
+
+In this paper, we present a new MAB algorithm called UCB-INF, where the objective of the allocation procedure is not only to minimize regret but also to estimate the mean and variance of outcome distributions accurately. We conducted simulations and compared the performance of UCB-INF with A/B testing and other MAB algorithms like UCB and $\epsilon$-greedy. We show that UCB-INF has regret comparable to that of UCB algorithm while estimation of mean and variance of outcome distributions is comparable to that of A/B testing. This algorithm is very useful in multiple domains like online experimentation, marketing, clinical trials, and public policy. It is especially effective in scenarios where there are a limited number of subjects available for allocation and the utility maximization is as important as estimating outcome distributions accurately. 
+
+In future, we want to use an algorithm similar to UCB-INF and investigate how the allocations change by optimizing for treatment effect distributions instead of outcome distribution. We also want to derive the asymptotic and finite time regret and variance bounds using statistical theory for UCB-INF.
+
+\newpage
+
+\bibliography{references}
+
+\begin{comment}
+\begin{figure}
+  \centering
+    \includegraphics[width=\textwidth]{figs/mean_rmse.png}
+      \caption{This figure shows the root mean squared error of variance estimation by different allocation procedures over time}
+    \label{mean_rmse}
+\end{figure}
+
+\end{comment}
+
+
+\end{document}
+
+
