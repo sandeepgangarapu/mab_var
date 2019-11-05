@@ -46,16 +46,6 @@ In order to solve this problem, we propose a new MAB algorithm called "UCB-INF" 
 
 \section*{Related Literature}
 
-
-1. MAB literature \\
-2. MAB applications \\
-3. MAB in IS \\
-4. Risk-Aware \\
-5. Bias in algs \\
-
-
-
-
 Multi-armed bandits are sequential experimentation problems with an exploration-exploitation trade-off. The key decision in an armed bandit problem is to whether stay with the intervention with the highest payoff based on observed data and exploit it or explore other interventions that might give higher payoffs in the future. Bandit problems have been studied since the 1930s and have application in several problem domains such as clinical trials, ad placement, website optimization, packet routing \citep{bubeck2012regret}. 
 
 One of the early bandit applications was in a clinical trial setting where \cite{thompson1933likelihood} used adaptive allocation to dynamically assign subjects to different drugs based on the observed outcomes in order to minimize allocations to the drug that did not perform well. In Thompson sampling, prior outcome distributions for each intervention are initialized with random parameters. At each round, a sample is drawn from each of these distributions, and an allocation is made to the intervention that has the highest value of the draw. An outcome is observed, and posterior distribution of that intervention is estimated using Bayesian update. This process is repeated every round. $\epsilon$-greedy is another simple algorithm where exploration and exploitation are clearly specified \citep{kuleshov2014algorithms}. At each round, the intervention with the best estimated mean outcome so far is selected with probability $\epsilon$ and a random intervention is selected with the empirical probability of $1-\epsilon$. However, the constant $\epsilon$ prevents the algorithm from asymptotically converging to the best arm \citep{vermorel2005multi}. Upper confidence bound (UCB) is one of the most efficient MAB algorithms.  In UCB algorithm, at each round, upper confidence bound of mean is calculated for each intervention using Chernoff-Hoeffding bound \citep{chernoff1952measure} and allocation is made to the intervention with the highest value of UCB. The intuition behind UCB is that if an allocation is made to the sub-optimal intervention, then a value drawn from that distribution reduces the upper confidence bound of the mean which in-turn makes it less probable for that intervention to have higher UCB in the future. 
